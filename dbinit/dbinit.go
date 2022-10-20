@@ -189,7 +189,7 @@ func CreateTables(db *database.Database) error {
 			"gasRebateToUser" boolean,
 			"premiumPercentageCharged" bigint,
 			"metadataJson" text COLLATE pg_catalog."default",
-			"incId" bigint NOT NULL DEFAULT nextval('"contracts_incId_seq"'::regclass),
+			"incId" BIGSERIAL NOT NULL,
 			"gasConsumedStr" character varying(100) COLLATE pg_catalog."default" DEFAULT 0,
 			"gasConsumed" bigint DEFAULT 0,
 			CONSTRAINT contracts_pkey PRIMARY KEY ("incId")
