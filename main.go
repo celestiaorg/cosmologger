@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -24,8 +25,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	tmClient "github.com/tendermint/tendermint/rpc/client/http"
-	// tmClient "github.com/tendermint/tendermint/rpc/client"
+	tmClient "github.com/tendermint/tendermint/rpc/client"
+	tmClientHttp "github.com/tendermint/tendermint/rpc/client/http"
 )
 
 /*--------------*/
@@ -72,12 +73,13 @@ func main() {
 	/*-------------*/
 
 	wsURI := os.Getenv("RPC_ADDRESS")
+	// wsURI = "tcp://127.0.0.1:26657"
 
 	fmt.Printf("\nConnecting to the RPC [%s]... ", wsURI)
 
 	//TODO: There is a known issue with the TM client when we use TLS
 	// cli, err := tmClient.NewWithClient(wsURI, "/websocket", client)
-	cli, err := tmClient.New(wsURI, "/websocket")
+	cli, err := tmClientHttp.New(wsURI)
 	if err != nil {
 		panic(err)
 	}
@@ -90,14 +92,15 @@ func main() {
 	var cliErr error
 	for i := 1; i <= configs.Configs.TendermintClient.ConnectRetry; i++ {
 
-		fmt.Printf("\tTrial #%d\n", i)
+		fmt.Printf("\r\tTrying to connect #%3d", i)
 		cliErr = cli.Start()
-		if cliErr == nil {
+		if cliErr == nil || errors.Is(cliErr, tmClient.ErrClientRunning) {
 			break
 		}
+		fmt.Printf("\terr: %v", cliErr)
 		time.Sleep(1 * time.Second)
 	}
-	if cliErr != nil {
+	if cliErr != nil && !errors.Is(cliErr, tmClient.ErrClientRunning) {
 		panic(cliErr)
 	}
 

@@ -20,7 +20,8 @@ import (
 	// sdkClient "github.com/cosmos/cosmos-sdk/client"
 	// authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	tmClient "github.com/tendermint/tendermint/rpc/client/http"
-	coretypes "github.com/tendermint/tendermint/rpc/core/types"
+	// coretypes "github.com/tendermint/tendermint/rpc/core/types"
+	"github.com/tendermint/tendermint/rpc/coretypes"
 	tmTypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc"
 )
@@ -81,70 +82,79 @@ func ProcessEvents(grpcCnn *grpc.ClientConn, evr coretypes.ResultEvent, db *data
 func getTxRecordFromEvent(evr coretypes.ResultEvent) TxRecord {
 	var txRecord TxRecord
 
-	if evr.Events["tx.height"] != nil && len(evr.Events["tx.height"]) > 0 {
-		txRecord.Height, _ = strconv.ParseUint(evr.Events["tx.height"][0], 10, 64)
+	// Let's make it simpler to process and compatible with the old code
+	events := map[string]string{}
+	for _, e := range evr.Events {
+		keyPrefix := e.Type
+		for _, a := range e.Attributes {
+			events[keyPrefix+"."+a.Key] = a.Value
+		}
 	}
 
-	if evr.Events["tx.hash"] != nil && len(evr.Events["tx.hash"]) > 0 {
-		txRecord.TxHash = evr.Events["tx.hash"][0]
+	if events["tx.height"] != "" {
+		txRecord.Height, _ = strconv.ParseUint(events["tx.height"], 10, 64)
 	}
 
-	if evr.Events["message.module"] != nil && len(evr.Events["message.module"]) > 0 {
-		txRecord.Module = evr.Events["message.module"][0]
+	if events["tx.hash"] != "" {
+		txRecord.TxHash = events["tx.hash"]
 	}
 
-	if evr.Events["message.sender"] != nil && len(evr.Events["message.sender"]) > 0 {
-		txRecord.Sender = evr.Events["message.sender"][0]
-
-	} else if evr.Events["transfer.sender"] != nil && len(evr.Events["transfer.sender"]) > 0 {
-
-		txRecord.Sender = evr.Events["transfer.sender"][0]
+	if events["message.module"] != "" {
+		txRecord.Module = events["message.module"]
 	}
 
-	if evr.Events["transfer.recipient"] != nil && len(evr.Events["transfer.recipient"]) > 0 {
-		txRecord.Receiver = evr.Events["transfer.recipient"][0]
+	if events["message.sender"] != "" {
+		txRecord.Sender = events["message.sender"]
+
+	} else if events["transfer.sender"] != "" {
+
+		txRecord.Sender = events["transfer.sender"]
 	}
 
-	if evr.Events["delegate.validator"] != nil && len(evr.Events["delegate.validator"]) > 0 {
-		txRecord.Validator = evr.Events["delegate.validator"][0]
-
-	} else if evr.Events["create_validator.validator"] != nil && len(evr.Events["create_validator.validator"]) > 0 {
-
-		txRecord.Validator = evr.Events["create_validator.validator"][0]
+	if events["transfer.recipient"] != "" {
+		txRecord.Receiver = events["transfer.recipient"]
 	}
 
-	if evr.Events["message.action"] != nil && len(evr.Events["message.action"]) > 0 {
-		txRecord.Action = evr.Events["message.action"][0]
+	if events["delegate.validator"] != "" {
+		txRecord.Validator = events["delegate.validator"]
+
+	} else if events["create_validator.validator"] != "" {
+
+		txRecord.Validator = events["create_validator.validator"]
 	}
 
-	if evr.Events["delegate.amount"] != nil && len(evr.Events["delegate.amount"]) > 0 {
-		txRecord.Amount = evr.Events["delegate.amount"][0]
-
-	} else if evr.Events["transfer.amount"] != nil && len(evr.Events["transfer.amount"]) > 0 {
-
-		txRecord.Amount = evr.Events["transfer.amount"][0]
+	if events["message.action"] != "" {
+		txRecord.Action = events["message.action"]
 	}
 
-	if evr.Events["tx.acc_seq"] != nil && len(evr.Events["tx.acc_seq"]) > 0 {
-		txRecord.TxAccSeq = evr.Events["tx.acc_seq"][0]
+	if events["delegate.amount"] != "" {
+		txRecord.Amount = events["delegate.amount"]
+
+	} else if events["transfer.amount"] != "" {
+
+		txRecord.Amount = events["transfer.amount"]
 	}
 
-	if evr.Events["tx.signature"] != nil && len(evr.Events["tx.signature"]) > 0 {
-		txRecord.TxSignature = evr.Events["tx.signature"][0]
+	if events["tx.acc_seq"] != "" {
+		txRecord.TxAccSeq = events["tx.acc_seq"]
 	}
 
-	if evr.Events["proposal_vote.proposal_id"] != nil && len(evr.Events["proposal_vote.proposal_id"]) > 0 {
-		txRecord.ProposalId, _ = strconv.ParseUint(evr.Events["proposal_vote.proposal_id"][0], 10, 64)
+	if events["tx.signature"] != "" {
+		txRecord.TxSignature = events["tx.signature"]
+	}
 
-	} else if evr.Events["proposal_deposit.proposal_id"] != nil && len(evr.Events["proposal_deposit.proposal_id"]) > 0 {
+	if events["proposal_vote.proposal_id"] != "" {
+		txRecord.ProposalId, _ = strconv.ParseUint(events["proposal_vote.proposal_id"], 10, 64)
 
-		txRecord.ProposalId, _ = strconv.ParseUint(evr.Events["proposal_deposit.proposal_id"][0], 10, 64)
+	} else if events["proposal_deposit.proposal_id"] != "" {
+
+		txRecord.ProposalId, _ = strconv.ParseUint(events["proposal_deposit.proposal_id"], 10, 64)
 	}
 
 	// Memo cannot be retrieved through tx events, we may fill it up with another way later
 	// txRecord.TxMemo =
 
-	jsonBytes, err := json.Marshal(evr.Events)
+	jsonBytes, err := json.Marshal(events)
 	if err == nil {
 		txRecord.Json = string(jsonBytes)
 	}
@@ -181,21 +191,23 @@ func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(configs.Configs.GRPC.CallTimeout))
 		defer cancel()
 
-		eventChan, err := cli.Subscribe(ctx, configs.Configs.TendermintClient.SubscriberName, tmTypes.QueryForEvent(tmTypes.EventTx).String())
+		eventChan, err := cli.Subscribe(ctx,
+			configs.Configs.TendermintClient.SubscriberName,
+			tmTypes.QueryForEvent(tmTypes.EventTxValue).String(),
+		)
 		if err != nil {
 			panic(err)
 		}
 
 		for {
 			evRes := <-eventChan
-			err := ProcessEvents(grpcCnn, evRes, db, insertQueue)
-			if err != nil {
+			if err := ProcessEvents(grpcCnn, evRes, db, insertQueue); err != nil {
 				log.Printf("Error in processing TX event: %v", err)
 			}
 		}
 	}()
 
-	fixEmptyEvents(cli, db)
+	// fixEmptyEvents(cli, db)
 }
 
 // Since some TX events are delayed and we catch them empty, we need to query them later to get them fixed
@@ -341,11 +353,11 @@ func getTxRecordFromJson(jsonByte []byte) TxRecord {
 	}
 
 	// if jsonVar["proposal_vote.proposal_id"] != nil && len(jsonVar["proposal_vote.proposal_id"]) > 0 {
-	// 	txRecord.ProposalId, _ = strconv.ParseUint(jsonVar["proposal_vote.proposal_id"][0], 10, 64)
+	// 	txRecord.ProposalId, _ = strconv.ParseUint(jsonVar["proposal_vote.proposal_id"], 10, 64)
 
 	// } else if jsonVar["proposal_deposit.proposal_id"] != nil && len(jsonVar["proposal_deposit.proposal_id"]) > 0 {
 
-	// 	txRecord.ProposalId, _ = strconv.ParseUint(jsonVar["proposal_deposit.proposal_id"][0], 10, 64)
+	// 	txRecord.ProposalId, _ = strconv.ParseUint(jsonVar["proposal_deposit.proposal_id"], 10, 64)
 	// }
 
 	if txRecord.Module == "" {

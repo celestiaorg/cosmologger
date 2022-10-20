@@ -29,23 +29,6 @@ RUN set -eux; \
 #     && git config --global url.ssh://git@github.com/.insteadOf https://github.com/
 
 
-# See https://github.com/CosmWasm/wasmvm/releases
-ADD https://github.com/CosmWasm/wasmvm/releases/download/v1.0.0-beta10/libwasmvm_muslc.aarch64.a /lib/libwasmvm_muslc.aarch64.a
-ADD https://github.com/CosmWasm/wasmvm/releases/download/v1.0.0-beta10/libwasmvm_muslc.x86_64.a /lib/libwasmvm_muslc.x86_64.a
-RUN sha256sum /lib/libwasmvm_muslc.aarch64.a | grep 5b7abfdd307568f5339e2bea1523a6aa767cf57d6a8c72bc813476d790918e44 \
-    && sha256sum /lib/libwasmvm_muslc.x86_64.a | grep 2f44efa9c6c1cda138bd1f46d8d53c5ebfe1f4a53cf3457b01db86472c4917ac \
-    # Copy the library you want to the final location that will be found by the linker flag `-lwasmvm_muslc`
-    && cp /lib/libwasmvm_muslc.${arch}.a /lib/libwasmvm_muslc.a
-
-# Archwayd binary
-RUN git clone https://github.com/archway-network/archway /root/archway\
-    && cd /root/archway \
-    && LEDGER_ENABLED=false BUILD_TAGS=muslc LINK_STATICALLY=true make build \
-    && echo "Ensuring binary is statically linked ..." \
-    && (file /root/archway/build/archwayd | grep "statically linked") \
-    && cp /root/archway/build/archwayd /build
-
-# Let's keep it in a separate layer
 RUN go get github.com/go-delve/delve/cmd/dlv \
     && go build -mod=readonly -buildvcs=false -o /build/app . \
     && cp conf.json /build/

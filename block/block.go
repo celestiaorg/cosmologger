@@ -19,8 +19,10 @@ import (
 	"github.com/celestiaorg/cosmologger/database"
 	"github.com/celestiaorg/cosmologger/validators"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+
+	// coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmClient "github.com/tendermint/tendermint/rpc/client/http"
-	coretypes "github.com/tendermint/tendermint/rpc/core/types"
+	"github.com/tendermint/tendermint/rpc/coretypes"
 	tmTypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc"
 )
@@ -129,7 +131,7 @@ func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, 
 		eventChan, err := cli.Subscribe(
 			ctx,
 			configs.Configs.TendermintClient.SubscriberName,
-			tmTypes.QueryForEvent(tmTypes.EventNewBlock).String(),
+			tmTypes.QueryForEvent(tmTypes.EventNewBlockValue).String(),
 		)
 		if err != nil {
 			panic(err)
@@ -137,15 +139,14 @@ func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, 
 
 		for {
 			evRes := <-eventChan
-			err := ProcessEvents(grpcCnn, &evRes, db, insertQueue)
-			if err != nil {
+			if err := ProcessEvents(grpcCnn, &evRes, db, insertQueue); err != nil {
 				//TODO: We need some customizable log level
 				log.Printf("Error in processing block event: %v", err)
 			}
 		}
 	}()
 
-	fixMissingBlocks(cli, db, insertQueue)
+	// fixMissingBlocks(cli, db, insertQueue)
 }
 
 // Sometimes some blocks get missed, so this function attempts to find them and fix them

@@ -11,7 +11,7 @@ The best way to install it is to do it through a bundle called [testnet-evaluato
 To have a development environment just run the following commands:
 
 ```bash
-git clone git@github.com:archway-network/cosmologger.git
+git clone git@github.com:celestiaorg/cosmologger.git
 cd cosmologger
 docker-compose up -d --build
 ```
