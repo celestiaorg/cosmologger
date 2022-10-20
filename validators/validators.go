@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/archway-network/cosmologger/configs"
-	"github.com/archway-network/cosmologger/database"
+	"github.com/celestiaorg/cosmologger/configs"
+	"github.com/celestiaorg/cosmologger/database"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	staking "github.com/cosmos/cosmos-sdk/x/staking/types"

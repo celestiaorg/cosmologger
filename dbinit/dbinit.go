@@ -5,7 +5,7 @@ import (
 
 	"strings"
 
-	"github.com/archway-network/cosmologger/database"
+	"github.com/celestiaorg/cosmologger/database"
 )
 
 /**

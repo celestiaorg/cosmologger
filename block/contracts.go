@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/archway-network/cosmologger/database"
+	"github.com/celestiaorg/cosmologger/database"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmTypes "github.com/tendermint/tendermint/types"
 

@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/archway-network/cosmologger/configs"
-	"github.com/archway-network/cosmologger/database"
-	"github.com/archway-network/cosmologger/validators"
+	"github.com/celestiaorg/cosmologger/configs"
+	"github.com/celestiaorg/cosmologger/database"
+	"github.com/celestiaorg/cosmologger/validators"
 
 	// sdkClient "github.com/cosmos/cosmos-sdk/client"
 	// authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"

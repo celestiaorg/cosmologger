@@ -11,13 +11,12 @@ import (
 	"syscall"
 	"time"
 
-	// "github.com/archway-network/archway/app/params"
-	// "github.com/archway-network/archway/app"
-	"github.com/archway-network/cosmologger/block"
-	"github.com/archway-network/cosmologger/configs"
-	"github.com/archway-network/cosmologger/database"
-	"github.com/archway-network/cosmologger/dbinit"
-	"github.com/archway-network/cosmologger/tx"
+	"github.com/celestiaorg/cosmologger/block"
+	"github.com/celestiaorg/cosmologger/configs"
+	"github.com/celestiaorg/cosmologger/database"
+	"github.com/celestiaorg/cosmologger/dbinit"
+	"github.com/celestiaorg/cosmologger/tx"
+	"github.com/joho/godotenv"
 
 	// "github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -30,32 +29,14 @@ import (
 )
 
 /*--------------*/
+
+const ENV_FILE = "../.env"
+
 func main() {
 
-	// str := "{\"developer_address\":\"archway1p69nfnrn9ju8ghqn4pcv7zqk2tpcsdwnganvnn\",\"reward_address\":\"archway1p69nfnrn9ju8ghqn4pcv7zqk2tpcsdwnganvnn\",\"gas_rebate_to_user\":false,\"collect_premium\":true,\"premium_percentage_charged\":\"70\"}"
-	// str := "[{\"denom\":\"stake\",\"amount\":\"0.001988500000000000\"}]"
-	// var metadataX []map[string]interface{}
-	// if err := json.Unmarshal([]byte(str), &metadataX); err != nil {
-	// 	panic(err)
-	// }
-	// metadata := metadataX[0]
-
-	// fmt.Printf("metadata[\"developer_address\"]: %s\n", metadata["developer_address"])
-	// fmt.Printf("metadata[\"developer_address\"]: %s\n", metadata["Gooz"])
-
-	// for i := range metadata {
-
-	// 	fmt.Printf("\n%#v ==> %#v\n", i, metadata[i])
-	// }
-
-	// numValue, err := strconv.ParseFloat(metadata["amount"].(string), 64)
-	// if err != nil {
-	// 	fmt.Printf("\nError in Unmarshaling '%s': %v\n", "amount", err)
-	// }
-
-	// fmt.Printf("numValue: %#v\n", numValue)
-
-	// return
+	if err := godotenv.Load(ENV_FILE); err != nil {
+		log.Fatalf("loading environment file `%s`: %v", ENV_FILE, err)
+	}
 
 	/*-------------*/
 
@@ -75,7 +56,7 @@ func main() {
 	// Check if we need to create tables and stuff on the DB
 	dbinit.DatabaseInit(db)
 
-	fmt.Printf("\nDone")
+	fmt.Printf("Done\n")
 
 	insertQueue := database.NewInsertQueue(db)
 	if err := insertQueue.Start(); err != nil {

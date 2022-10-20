@@ -1,10 +1,10 @@
-module github.com/archway-network/cosmologger
+module github.com/celestiaorg/cosmologger
 
 go 1.17
 
 require (
-	github.com/archway-network/archway v0.0.5
 	github.com/cosmos/cosmos-sdk v0.45.1
+	github.com/joho/godotenv v1.4.0
 	github.com/lib/pq v1.10.4
 	github.com/tendermint/tendermint v0.34.16
 	google.golang.org/grpc v1.44.0

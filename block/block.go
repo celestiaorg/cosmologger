@@ -15,9 +15,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/archway-network/cosmologger/configs"
-	"github.com/archway-network/cosmologger/database"
-	"github.com/archway-network/cosmologger/validators"
+	"github.com/celestiaorg/cosmologger/configs"
+	"github.com/celestiaorg/cosmologger/database"
+	"github.com/celestiaorg/cosmologger/validators"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	tmClient "github.com/tendermint/tendermint/rpc/client/http"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"

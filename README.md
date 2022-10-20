@@ -1,12 +1,15 @@
-# cosmologger
+# Cosmologger
+
 This is a logger tool that collects blocks and transactions as they are happening in a cosmos based network.
 
 ## Install
-The best way to install it is to do it through a bundle called [testnet-evaluator](https://github.com/archway-network/testnet-evaluator/). 
+
+The best way to install it is to do it through a bundle called [testnet-evaluator](https://github.com/celestiaorg/testnet-evaluator/). 
 
 ## Development
 
 To have a development environment just run the following commands:
+
 ```bash
 git clone git@github.com:archway-network/cosmologger.git
 cd cosmologger
@@ -25,7 +28,6 @@ To build and try:
 clear && go build . && ./cosmologger
 ```
 
-
 ## Configuration
 
 ### ENV Variables
@@ -42,8 +44,8 @@ clear && go build . && ./cosmologger
 
 **Note**: `cosmologger` creates all the database schema on its first run, so make sure the database user has enough privilege to create tables and indexes.
 
-
 ### Config file
+
 There is a `config.json` file, which has to be mapped into the app directory of the container. i.e. be in the same path of the executable.
 
 Here is what is inside the conf file:
@@ -62,16 +64,16 @@ Here is what is inside the conf file:
 
     "bech32_prefix" : {
         "account" :{
-            "address": "archway",
-            "pubkey": "archway"
+            "address": "celestia",
+            "pubkey": "celestiapub"
         },
         "validator" :{
-            "address": "archwayvaloper",
-            "pubkey": "archwayvaloperpub"
+            "address": "celestiavaloper",
+            "pubkey": "celestiavaloperpub"
         },
         "consensus" :{
-            "address": "archwayvalcons",
-            "pubkey": "archwayvalconspub"
+            "address": "celestiavalcons",
+            "pubkey": "celestiavalconspub"
         }
     }
 }
@@ -106,16 +108,16 @@ Here is what is inside the conf file:
 ```json
 "bech32_prefix" : {
         "account" :{
-            "address": "archway",
-            "pubkey": "archway"
+            "address": "celestia",
+            "pubkey": "celestiapub"
         },
         "validator" :{
-            "address": "archwayvaloper",
-            "pubkey": "archwayvaloperpub"
+            "address": "celestiavaloper",
+            "pubkey": "celestiavaloperpub"
         },
         "consensus" :{
-            "address": "archwayvalcons",
-            "pubkey": "archwayvalconspub"
+            "address": "celestiavalcons",
+            "pubkey": "celestiavalconspub"
         }
 }
 ```
