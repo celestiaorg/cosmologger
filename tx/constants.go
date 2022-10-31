@@ -6,6 +6,7 @@ const (
 	MODULE_DISTRIBUTION = "distribution"
 	MODULE_GOVERNANCE   = "governance"
 	MODULE_SLASHING     = "slashing"
+	MODULE_PAYMENT      = "payment"
 	MODULE_WASM         = "wasm"
 	MODULE_GAS_TRACKER  = "gastracker"
 
@@ -18,6 +19,7 @@ const (
 	ACTION_SUBMIT_PROPOSAL           = "/cosmos.gov.v1beta1.MsgSubmitProposal"                   // "submit_proposal"
 	ACTION_VOTE                      = "/cosmos.gov.v1beta1.MsgVote"                             // "vote"
 	ACTION_UNJAIL                    = "/cosmos.slashing.v1beta1.MsgUnjail"                      // "unjail"
+	ACTION_PFD                       = "/payment.MsgPayForData"                                  // "pfd"
 
 	ACTION_STORE_CODE            = "/cosmwasm.wasm.v1.MsgStoreCode"
 	ACTION_INSTANTIATE_CONTRACT  = "/cosmwasm.wasm.v1.MsgInstantiateContract"

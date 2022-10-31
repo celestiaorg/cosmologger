@@ -3,14 +3,9 @@ package tx
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
-	"os"
-	"os/exec"
-	"os/signal"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/celestiaorg/cosmologger/configs"
@@ -34,7 +29,7 @@ func ProcessEvents(grpcCnn *grpc.ClientConn, evr coretypes.ResultEvent, db *data
 	dbRow := rec.getDBRow()
 
 	qRes, _ := db.Load(database.TABLE_TX_EVENTS, database.RowType{database.FIELD_TX_EVENTS_TX_HASH: rec.TxHash})
-	if len(qRes) > 0 && rec.Module != "" {
+	if len(qRes) > 0 && rec.Action != "" {
 		// This tx is already in the DB, let's update it
 		go func() {
 			_, err := db.Update(
@@ -49,7 +44,7 @@ func ProcessEvents(grpcCnn *grpc.ClientConn, evr coretypes.ResultEvent, db *data
 
 	} else {
 
-		insertQueue.AddToInsertQueue(database.TABLE_TX_EVENTS, dbRow)
+		insertQueue.Add(database.TABLE_TX_EVENTS, dbRow)
 	}
 
 	// Let's add validator's info
@@ -109,6 +104,11 @@ func getTxRecordFromEvent(evr coretypes.ResultEvent) TxRecord {
 	} else if events["transfer.sender"] != "" {
 
 		txRecord.Sender = events["transfer.sender"]
+	}
+
+	if events["payfordata.signer"] != "" {
+
+		txRecord.Sender = events["payfordata.signer"]
 	}
 
 	if events["transfer.recipient"] != "" {
@@ -208,165 +208,4 @@ func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, 
 	}()
 
 	// fixEmptyEvents(cli, db)
-}
-
-// Since some TX events are delayed and we catch them empty, we need to query them later to get them fixed
-func fixEmptyEvents(cli *tmClient.HTTP, db *database.Database) {
-
-	quitChannel := make(chan os.Signal, 1)
-	signal.Notify(quitChannel,
-		syscall.SIGTERM,
-		syscall.SIGINT,
-		syscall.SIGQUIT,
-		os.Kill, //nolint
-		os.Interrupt)
-
-	go func() {
-
-		for {
-			select {
-			case <-quitChannel:
-				return
-			default:
-
-				// Get all TX events that are empty
-				rows, err := db.Load(database.TABLE_TX_EVENTS, database.RowType{database.FIELD_TX_EVENTS_MODULE: ""})
-				if err != nil {
-					log.Printf("Error in loading empty TX events: %v", err)
-				}
-
-				for _, row := range rows {
-					txHash := string(row[database.FIELD_TX_EVENTS_TX_HASH].([]uint8))
-					// Quering the TX from the Node...
-					rec, err := queryTx(cli, txHash)
-					if err != nil {
-						log.Printf("Error in querying TX: %s\t %v", txHash, err)
-						continue
-					}
-					rec.LogTime = time.Now()
-					dbRow := rec.getDBRow()
-
-					_, err = db.Update(database.TABLE_TX_EVENTS, dbRow, database.RowType{database.FIELD_TX_EVENTS_TX_HASH: rec.TxHash})
-					if err != nil {
-						log.Printf("[FixEmptyEvents] Err in `Update TX`: %s\t %v", txHash, err)
-					}
-				}
-
-				time.Sleep(time.Second)
-			}
-		}
-	}()
-
-}
-
-func queryTx(cli *tmClient.HTTP, txHash string) (TxRecord, error) {
-
-	wsURI := os.Getenv("RPC_ADDRESS")
-
-	// A dirty hack to get the things done
-	cmd := exec.Command("archwayd", "query", "tx", txHash, "--node", wsURI, "--output", "json")
-	stdout, err := cmd.Output()
-
-	if err != nil {
-		return TxRecord{}, err
-	}
-
-	rec := getTxRecordFromJson(stdout)
-
-	return rec, nil
-
-}
-
-func getTxRecordFromJson(jsonByte []byte) TxRecord {
-	var txRecord TxRecord
-	// jsonStr = strings.Trim(jsonStr, " \r\n\t")
-
-	jsonVar := make(map[string]interface{})
-	err := json.Unmarshal([]byte(jsonByte), &jsonVar)
-	if err != nil {
-		fmt.Printf("Unmarshaling JSON Err: %v\n", err.Error())
-		return txRecord
-	}
-
-	if jsonVar["height"] != nil && len(jsonVar["height"].(string)) > 0 {
-		txRecord.Height, _ = strconv.ParseUint(jsonVar["height"].(string), 10, 64)
-	}
-
-	if jsonVar["txhash"] != nil && len(jsonVar["txhash"].(string)) > 0 {
-		txRecord.TxHash = jsonVar["txhash"].(string)
-	}
-
-	if jsonVar["codespace"] != nil && len(jsonVar["codespace"].(string)) > 0 {
-		txRecord.Module = jsonVar["codespace"].(string)
-	}
-
-	messages := []interface{}{}
-	if txJson, ok := jsonVar["tx"].(map[string]interface{}); ok {
-		if body, ok := txJson["body"].(map[string]interface{}); ok {
-			if msgs, ok := body["messages"].([]interface{}); ok {
-				messages = msgs
-			}
-		}
-
-		if val, ok := txJson["signatures"].([]interface{}); ok {
-			txRecord.TxSignature = val[0].(string)
-		}
-	}
-
-	for i := range messages {
-		msg := messages[i].(map[string]interface{})
-		if val, ok := msg["@type"].(string); ok {
-			if val == "" {
-				val = "NA"
-			}
-			txRecord.Action = val
-		}
-
-		if val, ok := msg["sender"].(string); ok {
-			txRecord.Sender = val
-		} else if val, ok := msg["delegator_address"].(string); ok {
-			txRecord.Sender = val
-		} else if val, ok := msg["inputs"].([]interface{}); ok {
-
-			if addr, ok := val[0].(map[string]interface{})["address"].(string); ok {
-				txRecord.Sender = addr
-			}
-		}
-
-		if val, ok := msg["validator_address"].(string); ok {
-			txRecord.Receiver = val
-			txRecord.Validator = val
-		} else if val, ok := msg["recipient"].(string); ok {
-			txRecord.Receiver = val
-		} else if val, ok := msg["outputs"].([]interface{}); ok {
-			if addr, ok := val[0].(map[string]interface{})["address"].(string); ok {
-				txRecord.Receiver = addr
-			}
-		}
-
-		if val, ok := msg["value"].(map[string]interface{}); ok {
-			txRecord.Amount = val["amount"].(string) + val["denom"].(string)
-		} else if val, ok := msg["amount"].(map[string]interface{}); ok {
-			txRecord.Amount = val["amount"].(string) + val["denom"].(string)
-		}
-
-	}
-
-	// if jsonVar["proposal_vote.proposal_id"] != nil && len(jsonVar["proposal_vote.proposal_id"]) > 0 {
-	// 	txRecord.ProposalId, _ = strconv.ParseUint(jsonVar["proposal_vote.proposal_id"], 10, 64)
-
-	// } else if jsonVar["proposal_deposit.proposal_id"] != nil && len(jsonVar["proposal_deposit.proposal_id"]) > 0 {
-
-	// 	txRecord.ProposalId, _ = strconv.ParseUint(jsonVar["proposal_deposit.proposal_id"], 10, 64)
-	// }
-
-	if txRecord.Module == "" {
-		txRecord.Module = "NA"
-	}
-
-	txRecord.Json = string(jsonByte)
-
-	// LogTime: is recorded by the DBMS itself
-
-	return txRecord
 }

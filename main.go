@@ -90,104 +90,21 @@ func main() {
 	fmt.Printf("\nStarting the client...\n")
 
 	var cliErr error
-	for i := 1; i <= configs.Configs.TendermintClient.ConnectRetry; i++ {
+	for i := 1; i <= 100*configs.Configs.TendermintClient.ConnectRetry; i++ {
 
-		fmt.Printf("\r\tTrying to connect #%3d", i)
+		fmt.Printf("\r\tTrying to connect #%3.2f", float32(i)/100.0)
 		cliErr = cli.Start()
 		if cliErr == nil || errors.Is(cliErr, tmClient.ErrClientRunning) {
 			break
 		}
 		fmt.Printf("\terr: %v", cliErr)
-		time.Sleep(1 * time.Second)
+		time.Sleep(100 * time.Microsecond)
 	}
 	if cliErr != nil && !errors.Is(cliErr, tmClient.ErrClientRunning) {
 		panic(cliErr)
 	}
 
 	fmt.Println("\nDone")
-
-	/*------------------*/
-
-	// txHash := "A7E403D4B07A1C0D969DDE2560D306FC161650FF129B86382E213313F5757818"
-	// query := fmt.Sprintf("tx.hash='%s'", txHash)
-
-	// cliCtx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(configs.Configs.GRPC.CallTimeout))
-	// defer cancel()
-
-	// // hashByte, err := hex.DecodeString(txHash)
-	// // cli.Tx(hashByte, false)
-
-	// // res, err := cli.TxSearch(cliCtx, query, true, nil, nil, "")
-	// // fmt.Printf("res: %#v\n", res.Txs[0])
-	// // tx := *sdk.TxDecoder(res.Txs[0].TxResult.Data)
-
-	// // tx, err := sdk.TxDecoder(res.Txs[0].Tx.)
-	// // fmt.Printf("\nTX: %+v\n", tx.TxBody)
-
-	// // qClient := authx.NewQueryClient(&grpc.ClientConn{})
-	// // fmt.Printf("qClient: %v\n", qClient)
-
-	// // cliCtx
-
-	// // cliCtx := sdkClient.conte
-
-	// // res, err := authx.QueryTx(cliCtx, txHash)
-
-	// tcli, err := sdkClient.NewClientFromNode(wsURI)
-	// fmt.Printf("err: %v\n", err)
-
-	// res, err := tcli.TxSearch(cliCtx, query, true, nil, nil, "")
-	// fmt.Printf("err: %v\n", err)
-	// // fmt.Printf("res: %#v\n", res.Txs[0].Tx)
-
-	// /*------------*/
-
-	// // encodingConfig := params.MakeEncodingConfig()
-	// encodingConfig := MakeEncodingConfig()
-	// // encodingConfig.TxConfig.TxJSONDecoder()
-
-	// txb, err := encodingConfig.TxConfig.TxDecoder()(res.Txs[0].Tx)
-	// // txb, err := sdk.TxDecoder(res.Txs[0].Tx)
-
-	// // var cdc *codec.LegacyAmino
-
-	// // txb := legacytx.StdTx{}
-	// // err = cdc.Unmarshal(res.Txs[0].Tx, &txb)
-
-	// fmt.Printf("\n========\ntxb: %v\n\n========\n", txb)
-
-	// clientCtx := sdkClient.Context{
-	// 	// NodeURI: wsURI,
-	// 	// ChainID: "torii-1",
-	// 	Client:   cli,
-	// 	TxConfig: encodingConfig.TxConfig,
-	// }
-
-	// // // fmt.Printf("\n========\nclientCtx: %+v\n", clientCtx)
-	// output, err := authtx.QueryTx(clientCtx, txHash)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// fmt.Printf("\n========\noutput: %+v\n\n========\n", output)
-
-	// if output.Empty() {
-	// 	panic(fmt.Errorf("no transaction found with hash %s", txHash))
-	// }
-
-	// fmt.Printf("\n========\n%+v\n", clientCtx.PrintProto(output))
-
-	// // A dirty hack to get the things done
-	// cmd := exec.Command("archwayd", "query", "tx", txHash, "--node", wsURI, "--output", "json")
-	// stdout, err := cmd.Output()
-
-	// rec := getTxRecordFromJson(string(stdout))
-
-	// js, _ := json.MarshalIndent(rec, "", "  ")
-
-	// fmt.Printf("\n-------------------------\n\nREC: %s\n", js)
-
-	// panic(err)
 
 	/*------------------*/
 

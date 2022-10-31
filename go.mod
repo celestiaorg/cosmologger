@@ -12,6 +12,8 @@ require (
 	google.golang.org/grpc v1.47.0
 )
 
+require github.com/foize/go.fifo v0.0.0-20130327144150-3a04cfeec121
+
 require (
 	filippo.io/edwards25519 v1.0.0-rc.1 // indirect
 	github.com/99designs/keyring v1.1.6 // indirect

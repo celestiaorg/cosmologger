@@ -3,16 +3,8 @@ package block
 import (
 	"context"
 	"encoding/base64"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"log"
-	"os"
-	"os/exec"
-	"os/signal"
-	"regexp"
-	"strings"
-	"syscall"
 	"time"
 
 	"github.com/celestiaorg/cosmologger/configs"
@@ -34,13 +26,12 @@ func ProcessEvents(grpcCnn *grpc.ClientConn, evr *coretypes.ResultEvent, db *dat
 	fmt.Printf("Block: %s\tH: %d\tTxs: %d\n", rec.BlockHash, rec.Height, rec.NumOfTxs)
 
 	dbRow := rec.getBlockDBRow()
-	insertQueue.AddToInsertQueue(database.TABLE_BLOCKS, dbRow)
+	insertQueue.Add(database.TABLE_BLOCKS, dbRow)
 
-	dbRows := make([]database.RowType, len(rec.LastBlockSigners))
 	for i := range rec.LastBlockSigners {
-		dbRows[i] = rec.LastBlockSigners[i].getBlockSignerDBRow()
+		dbRow := rec.LastBlockSigners[i].getBlockSignerDBRow()
+		insertQueue.Add(database.TABLE_BLOCK_SIGNERS, dbRow)
 	}
-	insertQueue.AddToInsertQueue(database.TABLE_BLOCK_SIGNERS, dbRows...)
 
 	// Let's add genesis validator's info
 	if !genesisValidatorsDone && rec.Height > 50 {
@@ -147,109 +138,6 @@ func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, 
 	}()
 
 	// fixMissingBlocks(cli, db, insertQueue)
-}
-
-// Sometimes some blocks get missed, so this function attempts to find them and fix them
-func fixMissingBlocks(cli *tmClient.HTTP, db *database.Database, insertQueue *database.InsertQueue) {
-
-	quitChannel := make(chan os.Signal, 1)
-	signal.Notify(quitChannel,
-		syscall.SIGTERM,
-		syscall.SIGINT,
-		syscall.SIGQUIT,
-		os.Kill, //nolint
-		os.Interrupt)
-
-	go func() {
-
-		for {
-			select {
-			case <-quitChannel:
-				return
-			default:
-
-				// Get all missing blocks
-				latestBlockHeight, err := GetLatestBlockHeight(db)
-				if err != nil {
-					log.Printf("Error in finding LatestBlockHeight: %v", err)
-				}
-				missingBlocks, err := findMissingBlocks(1, latestBlockHeight, db)
-				if err != nil {
-					log.Printf("Error in finding missing blocks: %v", err)
-				}
-
-				for _, bh := range missingBlocks {
-
-					// Querying the Block from the Node...
-					rec, txs, err := queryBlock(bh)
-					if err != nil {
-						log.Printf("Error in querying Block: %d\t %v", bh, err)
-						continue
-					}
-					fmt.Printf("Block: %s\tH: %d\tTxs: %d\t[Add missing]\n", rec.BlockHash, rec.Height, rec.NumOfTxs)
-
-					dbRow := rec.getBlockDBRow()
-					insertQueue.AddToInsertQueue(database.TABLE_BLOCKS, dbRow)
-
-					// Adding the signers of the previous block
-					for i := range rec.LastBlockSigners {
-						// We insert them one by one, in case one fails due to e.g. duplication, the others will go through
-						insertQueue.AddToInsertQueue(database.TABLE_BLOCK_SIGNERS, rec.LastBlockSigners[i].getBlockSignerDBRow())
-					}
-
-					// Insert TX hashes into the `tx_events`,
-					// so the `tx.fixEmptyEvents` can pick them up, query them and fix them
-					for i := range *txs {
-						txHash := strings.ToUpper(hex.EncodeToString((*txs)[i].Hash()))
-						// We insert them one by one, in case one fails due to e.g. duplication, the others will go through
-						insertQueue.AddToInsertQueue(database.TABLE_TX_EVENTS, database.RowType{
-							database.FIELD_TX_EVENTS_TX_HASH: txHash,
-						})
-					}
-
-				}
-
-				time.Sleep(time.Second)
-			}
-		}
-	}()
-
-}
-
-func queryBlock(height uint64) (*BlockRecord, *tmTypes.Txs, error) {
-
-	wsURI := os.Getenv("RPC_ADDRESS")
-
-	heightStr := fmt.Sprintf("%d", height)
-
-	// A dirty hack to get the things done
-	cmd := exec.Command("archwayd", "query", "block", heightStr, "--node", wsURI) //, "--output", "json")
-	stdout, err := cmd.Output()
-
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Since unmarshaling fails to the tmType.Block (Consensus.block.header.version.block)
-	// We need to modify the JSON output to make it work
-	stdoutStr := string(stdout)
-	stdoutStr = regexp.MustCompile(`("block":)"([0-9]*?)"`).ReplaceAllString(stdoutStr, `$1$2`)
-	stdoutStr = regexp.MustCompile(`("height":)"([0-9]*?)"`).ReplaceAllString(stdoutStr, `$1$2`)
-
-	type tmBlock struct {
-		tmTypes.BlockID `json:"block_id"`
-		tmTypes.Block   `json:"block"`
-	}
-	var b tmBlock
-
-	err = json.Unmarshal([]byte(stdoutStr), &b)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	rec := getBlockRecordFromTmBlock(&b.Block)
-	return rec, &b.Block.Txs, nil
-
 }
 
 func findMissingBlocks(start, end uint64, db *database.Database) ([]uint64, error) {

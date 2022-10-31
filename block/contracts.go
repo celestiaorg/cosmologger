@@ -1,10 +1,7 @@
 package block
 
 import (
-	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/celestiaorg/cosmologger/database"
 	"github.com/tendermint/tendermint/rpc/coretypes"
@@ -22,7 +19,7 @@ func ProcessContractEvents(grpcCnn *grpc.ClientConn, evr *coretypes.ResultEvent,
 
 	dbRow := rec.getDBRow()
 
-	insertQueue.AddToInsertQueue(database.TABLE_CONTRACTS, dbRow)
+	insertQueue.Add(database.TABLE_CONTRACTS, dbRow)
 	return nil
 }
 
@@ -113,32 +110,4 @@ func (c *ContractRecord) getDBRow() database.RowType {
 		database.FIELD_CONTRACTS_PREMIUM_PERCENTAGE_CHARGED: c.PremiumPercentageCharged,
 		database.FIELD_CONTRACTS_METADATA_JSON:              c.MetadataJson,
 	}
-}
-
-func getGasTrackerRewardFromString(str string) (GasTrackerReward, error) {
-
-	// Let's make it an array if not, to keep compatibility
-	if !strings.HasPrefix(str, "[") {
-		str = "[" + str + "]"
-	}
-
-	var tmpMapArr []map[string]interface{}
-	if err := json.Unmarshal([]byte(str), &tmpMapArr); err != nil {
-		return GasTrackerReward{}, err
-	}
-
-	if len(tmpMapArr) == 0 {
-		return GasTrackerReward{}, fmt.Errorf("no GasTrackerReward found")
-	}
-	tmpMap := tmpMapArr[0]
-
-	numValue, err := strconv.ParseFloat(tmpMap[EVENT_FIELD_AMOUNT].(string), 64)
-	if err != nil {
-		return GasTrackerReward{}, err
-	}
-
-	return GasTrackerReward{
-		Denom:  tmpMap[EVENT_FIELD_DENOM].(string),
-		Amount: numValue,
-	}, nil
 }

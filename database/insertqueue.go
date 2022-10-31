@@ -3,31 +3,31 @@ package database
 import (
 	"fmt"
 	"log"
-	"sync"
+	"time"
+
+	fifo "github.com/foize/go.fifo"
 )
 
 type InsertQueue struct {
-	insert          chan InsertQueueItem
-	db              *Database
-	closeProtection sync.Once
-	closed          bool
+	insert *fifo.Queue
+	db     *Database
+	closed bool
 }
 
 func NewInsertQueue(db *Database) *InsertQueue {
 	return &InsertQueue{
-		insert:          make(chan InsertQueueItem, 100),
-		closeProtection: sync.Once{},
-		closed:          false,
-		db:              db,
+		insert: fifo.NewQueue(),
+		closed: false,
+		db:     db,
 	}
 }
 
-func (i *InsertQueue) AddToInsertQueue(table string, row ...RowType) {
-	i.insert <- InsertQueueItem{
+func (i *InsertQueue) Add(table string, row ...RowType) {
+	i.insert.Add(&InsertQueueItem{
 		Table: table,
 		Rows:  row,
 		DB:    i.db,
-	}
+	})
 }
 
 func (i *InsertQueue) Start() error {
@@ -35,26 +35,24 @@ func (i *InsertQueue) Start() error {
 		return fmt.Errorf("queue is already closed")
 	}
 	go func() {
-	Exit:
-		for {
-			select {
-			case item, ok := <-i.insert:
-				if !ok {
-					log.Printf("Insert queue channel was closed, breaking out")
-					break Exit
-				}
-				if len(item.Rows) == 0 {
-					continue
-				} else if len(item.Rows) == 1 {
-					_, err := i.db.Insert(item.Table, item.Rows[0])
-					if err != nil {
-						log.Printf("Error in Async Insert: %v\n", err)
-					}
-				} else {
-					_, err := i.db.BatchInsert(item.Table, item.Rows...)
-					if err != nil {
-						log.Printf("Error in Async Batch Insert: %v\n", err)
-					}
+		for !i.closed {
+
+			item := i.insert.Next()
+			if item == nil {
+				// Queue is empty, keep waiting
+				time.Sleep(50 * time.Millisecond)
+				continue
+			}
+
+			iq := item.(*InsertQueueItem)
+			if len(iq.Rows) == 0 {
+				continue
+			}
+
+			for _, row := range iq.Rows {
+				_, err := i.db.Insert(iq.Table, row)
+				if err != nil {
+					log.Printf("async insert: %v\nrow: %#v\n", err, row)
 				}
 			}
 		}
@@ -63,8 +61,5 @@ func (i *InsertQueue) Start() error {
 }
 
 func (i *InsertQueue) Stop() {
-	i.closeProtection.Do(func() {
-		close(i.insert)
-		i.closed = true
-	})
+	i.closed = true
 }
