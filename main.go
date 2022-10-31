@@ -90,9 +90,9 @@ func main() {
 	fmt.Printf("\nStarting the client...\n")
 
 	var cliErr error
-	for i := 1; i <= 100*configs.Configs.TendermintClient.ConnectRetry; i++ {
+	for i := 1; i <= 1000*configs.Configs.TendermintClient.ConnectRetry; i++ {
 
-		fmt.Printf("\r\tTrying to connect #%3.2f", float32(i)/100.0)
+		fmt.Printf("\r\tTrying to connect #%3.2f", float32(i)/1000.0)
 		cliErr = cli.Start()
 		if cliErr == nil || errors.Is(cliErr, tmClient.ErrClientRunning) {
 			break

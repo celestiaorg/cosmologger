@@ -59,7 +59,26 @@ func GetConsAddressFromConsPubKey(inKey []byte) string {
 	return sdk.ConsAddress(pubkey.Address().Bytes()).String()
 }
 
-func DoesConsAddrExistInDB(db *database.Database, valAddr string) (bool, error) {
+func DoesConsAddrExistInDB(db *database.Database, consAddr string) (bool, error) {
+
+	SQL := fmt.Sprintf(`
+			SELECT 
+				COUNT(*) as "total"
+			FROM "%s" 
+			WHERE "%s" = $1`,
+		database.TABLE_VALIDATORS,
+		database.FIELD_VALIDATORS_CONS_ADDR,
+	)
+
+	rows, err := db.Query(SQL, database.QueryParams{consAddr})
+	if err != nil {
+		return false, err
+	}
+
+	return rows[0]["total"].(int64) > 0, nil
+}
+
+func DoesOperAddrExistInDB(db *database.Database, operAddr string) (bool, error) {
 
 	SQL := fmt.Sprintf(`
 			SELECT 
@@ -70,7 +89,7 @@ func DoesConsAddrExistInDB(db *database.Database, valAddr string) (bool, error) 
 		database.FIELD_VALIDATORS_OPR_ADDR,
 	)
 
-	rows, err := db.Query(SQL, database.QueryParams{valAddr})
+	rows, err := db.Query(SQL, database.QueryParams{operAddr})
 	if err != nil {
 		return false, err
 	}
@@ -80,7 +99,7 @@ func DoesConsAddrExistInDB(db *database.Database, valAddr string) (bool, error) 
 
 func AddNewValidator(db *database.Database, grpcCnn *grpc.ClientConn, valAddr string) error {
 
-	exist, err := DoesConsAddrExistInDB(db, valAddr)
+	exist, err := DoesOperAddrExistInDB(db, valAddr)
 	if err != nil {
 		return err
 	}
@@ -178,8 +197,14 @@ func QueryValidatorsList(grpcCnn *grpc.ClientConn) ([]string, error) {
 
 		for i := range response.Validators {
 			validatorsList = append(validatorsList, response.Validators[i].OperatorAddress)
+			//TODO: Remove these prints
+			// fmt.Printf("Validator: %v \t %v\n", response.Validators[i].OperatorAddress, response.Validators[i].Description.Moniker)
 		}
 	}
+
+	// fmt.Printf("\n\n\tlen(validatorsList): %+v\n", len(validatorsList))
+
+	// panic(0)
 
 	return validatorsList, nil
 }

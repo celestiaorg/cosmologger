@@ -19,8 +19,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-var genesisValidatorsDone bool
-
 func ProcessEvents(grpcCnn *grpc.ClientConn, evr *coretypes.ResultEvent, db *database.Database, insertQueue *database.InsertQueue) error {
 	rec := getBlockRecordFromEvent(evr)
 	fmt.Printf("Block: %s\tH: %d\tTxs: %d\n", rec.BlockHash, rec.Height, rec.NumOfTxs)
@@ -28,15 +26,21 @@ func ProcessEvents(grpcCnn *grpc.ClientConn, evr *coretypes.ResultEvent, db *dat
 	dbRow := rec.getBlockDBRow()
 	insertQueue.Add(database.TABLE_BLOCKS, dbRow)
 
+	queryNewValidators := false
 	for i := range rec.LastBlockSigners {
+
+		if !queryNewValidators {
+			if exist, err := validators.DoesConsAddrExistInDB(db, rec.LastBlockSigners[i].ValConsAddr); err == nil && !exist {
+				queryNewValidators = true
+			}
+		}
+
 		dbRow := rec.LastBlockSigners[i].getBlockSignerDBRow()
 		insertQueue.Add(database.TABLE_BLOCK_SIGNERS, dbRow)
 	}
 
-	// Let's add genesis validator's info
-	if !genesisValidatorsDone && rec.Height > 50 {
-		// Let's do it only once
-		genesisValidatorsDone = true
+	// Let's query validators to be more reliable
+	if queryNewValidators {
 
 		// Just to make things non-blocking
 		go func() {
