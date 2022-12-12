@@ -17,13 +17,13 @@ import (
 	"github.com/celestiaorg/cosmologger/database"
 	"github.com/celestiaorg/cosmologger/dbinit"
 	"github.com/celestiaorg/cosmologger/tx"
-	"github.com/joho/godotenv"
 
 	// "github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	// "github.com/cosmos/cosmos-sdk/x/auth/legacy/legacytx"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
 	tmClient "github.com/tendermint/tendermint/rpc/client"
 	tmClientHttp "github.com/tendermint/tendermint/rpc/client/http"
@@ -31,15 +31,7 @@ import (
 
 /*--------------*/
 
-const ENV_FILE = "../.env"
-
 func main() {
-
-	if err := godotenv.Load(ENV_FILE); err != nil {
-		log.Fatalf("loading environment file `%s`: %v", ENV_FILE, err)
-	}
-
-	/*-------------*/
 
 	psqlconn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		os.Getenv("POSTGRES_HOST"),
@@ -73,12 +65,10 @@ func main() {
 	/*-------------*/
 
 	wsURI := os.Getenv("RPC_ADDRESS")
-	// wsURI = "tcp://127.0.0.1:26657"
 
 	fmt.Printf("\nConnecting to the RPC [%s]... ", wsURI)
 
 	//TODO: There is a known issue with the TM client when we use TLS
-	// cli, err := tmClient.NewWithClient(wsURI, "/websocket", client)
 	cli, err := tmClientHttp.New(wsURI)
 	if err != nil {
 		panic(err)
@@ -118,11 +108,22 @@ func main() {
 
 	/*------------------*/
 
+	var blockDataCollectionMode block.DataCollectionMode
+
+	dataColelctionMode := os.Getenv("DATA_COLLECTION_MODE")
+	if dataColelctionMode == "pull" {
+		blockDataCollectionMode = block.PullMode
+
+	} else if dataColelctionMode == "event" {
+
+		blockDataCollectionMode = block.EventMode
+	}
+
 	fmt.Println("\nListening...")
 	// Running the listeners
 	tx.Start(cli, grpcCnn, db, insertQueue)
 	// tx.FixEmptyEvents(cli, grpcCnn, db)
-	block.Start(cli, grpcCnn, db, insertQueue)
+	block.Start(cli, grpcCnn, db, insertQueue, blockDataCollectionMode)
 
 	/*------------------*/
 
@@ -154,13 +155,13 @@ func GrpcConnect() (*grpc.ClientConn, error) {
 	GRPCServer := os.Getenv("GRPC_ADDRESS")
 
 	fmt.Printf("\nConnecting to the GRPC [%s] \tTLS: [%s]", GRPCServer, tlsEnabled)
+	defer fmt.Println("\nDone")
 
 	if strings.ToLower(tlsEnabled) == "true" {
 		creds := credentials.NewTLS(&tls.Config{})
 		return grpc.Dial(GRPCServer, grpc.WithTransportCredentials(creds))
 	}
-	return grpc.Dial(GRPCServer, grpc.WithInsecure())
-
+	return grpc.Dial(GRPCServer, grpc.WithTransportCredentials(insecure.NewCredentials()))
 }
 
 func SetBech32Prefixes() {

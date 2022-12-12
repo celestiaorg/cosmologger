@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/celestiaorg/cosmologger/configs"
@@ -19,8 +20,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-func ProcessEvents(grpcCnn *grpc.ClientConn, evr *coretypes.ResultEvent, db *database.Database, insertQueue *database.InsertQueue) error {
-	rec := getBlockRecordFromEvent(evr)
+func ProcessEvents(grpcCnn *grpc.ClientConn, rec *BlockRecord, db *database.Database, insertQueue *database.InsertQueue) error {
+
 	fmt.Printf("Block: %s\tH: %d\tTxs: %d\n", rec.BlockHash, rec.Height, rec.NumOfTxs)
 
 	dbRow := rec.getBlockDBRow()
@@ -62,7 +63,7 @@ func ProcessEvents(grpcCnn *grpc.ClientConn, evr *coretypes.ResultEvent, db *dat
 		}()
 	}
 
-	return ProcessContractEvents(grpcCnn, evr, db, insertQueue)
+	return nil
 }
 
 func getBlockRecordFromEvent(evr *coretypes.ResultEvent) *BlockRecord {
@@ -116,30 +117,76 @@ func (s *BlockSignersRecord) getBlockSignerDBRow() database.RowType {
 	}
 }
 
-func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, insertQueue *database.InsertQueue) {
+func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, insertQueue *database.InsertQueue, mode DataCollectionMode) {
 
-	go func() {
+	if mode == PullMode {
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(configs.Configs.GRPC.CallTimeout))
-		defer cancel()
+		go func() {
 
-		eventChan, err := cli.Subscribe(
-			ctx,
-			configs.Configs.TendermintClient.SubscriberName,
-			tmTypes.QueryForEvent(tmTypes.EventNewBlockValue).String(),
-		)
-		if err != nil {
-			panic(err)
-		}
-
-		for {
-			evRes := <-eventChan
-			if err := ProcessEvents(grpcCnn, &evRes, db, insertQueue); err != nil {
-				//TODO: We need some customizable log level
-				log.Printf("Error in processing block event: %v", err)
+			heightU, err := GetLatestBlockHeight(db)
+			if err != nil {
+				log.Fatalf("getting the latest block height: %v", err)
 			}
-		}
-	}()
+			height := int64(heightU) + 1
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(configs.Configs.GRPC.CallTimeout))
+			defer cancel()
+
+			for {
+
+				res, err := cli.Block(ctx, &height)
+				if err != nil {
+					if strings.Contains(err.Error(), "must be less than or equal to the current blockchain height") {
+						// We reached the current head, need to wait for a while
+						log.Printf("waiting for new blocks...")
+						time.Sleep(time.Second * 5)
+						continue // Try again
+					}
+
+					log.Printf("getting the block data: %v", err)
+					time.Sleep(time.Microsecond * 50)
+					continue // Try again
+				}
+
+				rec := getBlockRecordFromTmBlock(res.Block)
+				if err := ProcessEvents(grpcCnn, rec, db, insertQueue); err != nil {
+					log.Printf("processing block event: %v", err)
+				}
+
+				height++
+			}
+
+		}()
+
+		return
+	}
+
+	if mode == EventMode {
+		go func() {
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(configs.Configs.GRPC.CallTimeout))
+			defer cancel()
+
+			eventChan, err := cli.Subscribe(
+				ctx,
+				configs.Configs.TendermintClient.SubscriberName,
+				tmTypes.QueryForEvent(tmTypes.EventNewBlockValue).String(),
+			)
+			if err != nil {
+				panic(err)
+			}
+
+			for {
+				evRes := <-eventChan
+				rec := getBlockRecordFromEvent(&evRes)
+				if err := ProcessEvents(grpcCnn, rec, db, insertQueue); err != nil {
+					//TODO: We need some customizable log level
+					log.Printf("processing block event: %v", err)
+				}
+			}
+		}()
+		return
+	}
 
 	// fixMissingBlocks(cli, db, insertQueue)
 }

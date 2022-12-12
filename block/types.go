@@ -39,3 +39,10 @@ type GasTrackerReward struct {
 	Denom  string  `json:"denom"`
 	Amount float64 `json:"amount"`
 }
+
+type DataCollectionMode int
+
+const (
+	PullMode DataCollectionMode = iota + 1
+	EventMode
+)

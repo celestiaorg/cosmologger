@@ -1,18 +1,20 @@
 module github.com/celestiaorg/cosmologger
 
-go 1.17
+go 1.19
 
 require (
 	// github.com/cosmos/cosmos-sdk v0.45.1
 	github.com/cosmos/cosmos-sdk v0.46.0-beta2.0.20220418184507-c53157dd63f6
-	github.com/joho/godotenv v1.4.0
 	github.com/lib/pq v1.10.6
 	github.com/tendermint/tendermint v0.35.9
 	// google.golang.org/grpc v1.44.0
 	google.golang.org/grpc v1.47.0
 )
 
-require github.com/foize/go.fifo v0.0.0-20130327144150-3a04cfeec121
+require (
+	github.com/davecgh/go-spew v1.1.1
+	github.com/foize/go.fifo v0.0.0-20130327144150-3a04cfeec121
+)
 
 require (
 	filippo.io/edwards25519 v1.0.0-rc.1 // indirect
@@ -33,7 +35,6 @@ require (
 	github.com/cosmos/ledger-cosmos-go v0.11.1 // indirect
 	github.com/cosmos/ledger-go v0.9.2 // indirect
 	github.com/danieljoos/wincred v1.0.2 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
