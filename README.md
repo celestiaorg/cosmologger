@@ -42,6 +42,8 @@ clear && go build . && ./cosmologger
 * **POSTGRES_PORT**: Port number of the database
 * **POSTGRES_HOST**: Host address of the server running postgres
 
+* **DATA_COLLECTION_MODE**: Determines the mode of data collection. Available values: {'pull' | 'event'}. _event mode is recommended_
+
 **Note**: `cosmologger` creates all the database schema on its first run, so make sure the database user has enough privilege to create tables and indexes.
 
 ### Config file
