@@ -11,7 +11,7 @@ export GRPC_ADDRESS=127.0.0.1:9092
 export GRPC_TLS=false
 
 
-export DATA_COLLECTION_MODE="pull"  # available values {'pull' | 'event'}
+export DATA_COLLECTION_MODE="event"  # available values {'pull' | 'event'}
 
 
-go mod tidy -compat=1.17 && reset && go build -o app . && ./app
+go mod tidy  && reset && go build -o app . && ./app

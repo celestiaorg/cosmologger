@@ -13,9 +13,8 @@ import (
 	"github.com/celestiaorg/cosmologger/validators"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	// coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmClient "github.com/tendermint/tendermint/rpc/client/http"
-	"github.com/tendermint/tendermint/rpc/coretypes"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmTypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc"
 )
@@ -129,10 +128,9 @@ func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, 
 			}
 			height := int64(heightU) + 1
 
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(configs.Configs.GRPC.CallTimeout))
-			defer cancel()
-
 			for {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(configs.Configs.GRPC.CallTimeout))
+				defer cancel()
 
 				res, err := cli.Block(ctx, &height)
 				if err != nil {
@@ -170,7 +168,7 @@ func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, 
 			eventChan, err := cli.Subscribe(
 				ctx,
 				configs.Configs.TendermintClient.SubscriberName,
-				tmTypes.QueryForEvent(tmTypes.EventNewBlockValue).String(),
+				tmTypes.QueryForEvent(tmTypes.EventNewBlock).String(),
 			)
 			if err != nil {
 				panic(err)

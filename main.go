@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -25,7 +24,6 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
-	tmClient "github.com/tendermint/tendermint/rpc/client"
 	tmClientHttp "github.com/tendermint/tendermint/rpc/client/http"
 )
 
@@ -69,7 +67,7 @@ func main() {
 	fmt.Printf("\nConnecting to the RPC [%s]... ", wsURI)
 
 	//TODO: There is a known issue with the TM client when we use TLS
-	cli, err := tmClientHttp.New(wsURI)
+	cli, err := tmClientHttp.New(wsURI, "/websocket")
 	if err != nil {
 		panic(err)
 	}
@@ -84,13 +82,13 @@ func main() {
 
 		fmt.Printf("\r\tTrying to connect #%3.2f", float32(i)/1000.0)
 		cliErr = cli.Start()
-		if cliErr == nil || errors.Is(cliErr, tmClient.ErrClientRunning) {
+		if cliErr == nil {
 			break
 		}
 		fmt.Printf("\terr: %v", cliErr)
 		time.Sleep(100 * time.Microsecond)
 	}
-	if cliErr != nil && !errors.Is(cliErr, tmClient.ErrClientRunning) {
+	if cliErr != nil {
 		panic(cliErr)
 	}
 
@@ -109,19 +107,25 @@ func main() {
 	/*------------------*/
 
 	var blockDataCollectionMode block.DataCollectionMode
+	var txDataCollectionMode tx.DataCollectionMode
 
 	dataColelctionMode := os.Getenv("DATA_COLLECTION_MODE")
 	if dataColelctionMode == "pull" {
 		blockDataCollectionMode = block.PullMode
+		txDataCollectionMode = tx.PullMode
+
+		log.Printf("Running data collection in Pull mode")
 
 	} else if dataColelctionMode == "event" {
 
 		blockDataCollectionMode = block.EventMode
+		txDataCollectionMode = tx.EventMode
+		log.Printf("Running data collection in Event mode")
 	}
 
 	fmt.Println("\nListening...")
 	// Running the listeners
-	tx.Start(cli, grpcCnn, db, insertQueue)
+	tx.Start(cli, grpcCnn, db, insertQueue, txDataCollectionMode)
 	// tx.FixEmptyEvents(cli, grpcCnn, db)
 	block.Start(cli, grpcCnn, db, insertQueue, blockDataCollectionMode)
 

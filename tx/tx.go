@@ -3,6 +3,7 @@ package tx
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -14,18 +15,18 @@ import (
 
 	// sdkClient "github.com/cosmos/cosmos-sdk/client"
 	// authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
+
 	tmClient "github.com/tendermint/tendermint/rpc/client/http"
-	// coretypes "github.com/tendermint/tendermint/rpc/core/types"
-	"github.com/tendermint/tendermint/rpc/coretypes"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
+
+	// "github.com/tendermint/tendermint/rpc/coretypes"
 	tmTypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc"
 )
 
-func ProcessEvents(grpcCnn *grpc.ClientConn, evr coretypes.ResultEvent, db *database.Database, insertQueue *database.InsertQueue) error {
+func ProcessEvents(grpcCnn *grpc.ClientConn, rec TxRecord, db *database.Database, insertQueue *database.InsertQueue) error {
 
-	rec := getTxRecordFromEvent(evr)
 	rec.LogTime = time.Now()
-
 	dbRow := rec.getDBRow()
 
 	qRes, _ := db.Load(database.TABLE_TX_EVENTS, database.RowType{database.FIELD_TX_EVENTS_TX_HASH: rec.TxHash})
@@ -77,12 +78,11 @@ func ProcessEvents(grpcCnn *grpc.ClientConn, evr coretypes.ResultEvent, db *data
 func getTxRecordFromEvent(evr coretypes.ResultEvent) TxRecord {
 	var txRecord TxRecord
 
-	// Let's make it simpler to process and compatible with the old code
+	// Simplify the nested map by flattening it
 	events := map[string]string{}
-	for _, e := range evr.Events {
-		keyPrefix := e.Type
-		for _, a := range e.Attributes {
-			events[keyPrefix+"."+a.Key] = a.Value
+	for k, v := range evr.Events {
+		if len(v) > 0 {
+			events[k] = v[0]
 		}
 	}
 
@@ -184,28 +184,149 @@ func (t TxRecord) getDBRow() database.RowType {
 	}
 }
 
-func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, insertQueue *database.InsertQueue) {
+func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, insertQueue *database.InsertQueue, mode DataCollectionMode) {
 
-	go func() {
+	if mode == PullMode {
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(configs.Configs.GRPC.CallTimeout))
-		defer cancel()
+		go func() {
 
-		eventChan, err := cli.Subscribe(ctx,
-			configs.Configs.TendermintClient.SubscriberName,
-			tmTypes.QueryForEvent(tmTypes.EventTxValue).String(),
-		)
-		if err != nil {
-			panic(err)
-		}
-
-		for {
-			evRes := <-eventChan
-			if err := ProcessEvents(grpcCnn, evRes, db, insertQueue); err != nil {
-				log.Printf("Error in processing TX event: %v", err)
+			height, err := getLatestProcessedBlockHeight(db)
+			if err != nil {
+				log.Fatalf("getting the latest processed block height in tx_events: %v", err)
 			}
-		}
-	}()
+			height++
+
+			for {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(configs.Configs.GRPC.CallTimeout))
+				defer cancel()
+
+				txs, err := queryTxsByHeight(ctx, cli, height)
+				if err != nil {
+					log.Printf("getting the tx_events data: %v", err)
+					time.Sleep(time.Microsecond * 50)
+					continue // Try again
+				}
+
+				for _, t := range txs {
+					if err := ProcessEvents(grpcCnn, *t, db, insertQueue); err != nil {
+						log.Printf("processing tx_event: %v", err)
+					}
+				}
+
+				height++
+			}
+
+		}()
+
+		return
+	}
+
+	if mode == EventMode {
+
+		go func() {
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(configs.Configs.GRPC.CallTimeout))
+			defer cancel()
+
+			eventChan, err := cli.Subscribe(ctx,
+				configs.Configs.TendermintClient.SubscriberName,
+				tmTypes.QueryForEvent(tmTypes.EventTx).String(),
+			)
+			if err != nil {
+				panic(err)
+			}
+
+			for {
+				evRes := <-eventChan
+				rec := getTxRecordFromEvent(evRes)
+				if err := ProcessEvents(grpcCnn, rec, db, insertQueue); err != nil {
+					log.Printf("processing TX event: %v", err)
+				}
+			}
+		}()
+
+		return
+	}
 
 	// fixEmptyEvents(cli, db)
+}
+
+func getLatestProcessedBlockHeight(db *database.Database) (uint64, error) {
+
+	SQL := fmt.Sprintf(
+		`SELECT MAX("%s") AS "result" FROM "%s"`,
+
+		database.FIELD_TX_EVENTS_HEIGHT,
+		database.TABLE_TX_EVENTS,
+	)
+
+	rows, err := db.Query(SQL, database.QueryParams{})
+	if err != nil {
+		return 0, err
+	}
+
+	if len(rows) == 0 ||
+		rows[0] == nil ||
+		rows[0]["result"] == nil {
+		return 0, nil
+	}
+
+	return uint64(rows[0]["result"].(int64)), nil
+}
+
+func queryTxsByHeight(ctx context.Context, cli *tmClient.HTTP, height uint64) ([]*TxRecord, error) {
+
+	recs := []*TxRecord{}
+
+	pg := 1
+	ppg := 100
+
+	for {
+
+		res, err := cli.TxSearch(ctx, fmt.Sprintf("tx.height=%d", height), false, &pg, &ppg, "")
+		if err != nil {
+			return nil, err
+		}
+
+		if res.TotalCount == 0 {
+			break
+		}
+
+		for _, t := range res.Txs {
+			rec := getTxRecordFromTxResult(t)
+			recs = append(recs, &rec)
+		}
+
+		if res.TotalCount <= ppg*pg {
+			break
+		}
+
+		pg++
+	}
+
+	return recs, nil
+
+}
+
+func getTxRecordFromTxResult(t *coretypes.ResultTx) TxRecord {
+
+	evr := coretypes.ResultEvent{}
+	evr.Events = make(map[string][]string)
+
+	for _, e := range t.TxResult.Events {
+		keyPrefix := e.Type
+		for _, a := range e.Attributes {
+			k := keyPrefix + "." + string(a.Key)
+			if evr.Events[k] == nil {
+				evr.Events[k] = []string{string(a.Value)}
+			} else {
+				evr.Events[k] = append(evr.Events[k], string(a.Value))
+			}
+		}
+	}
+
+	evr.Events["tx.hash"] = []string{t.Hash.String()}
+	evr.Events["tx.height"] = []string{fmt.Sprintf("%d", t.Height)}
+
+	return getTxRecordFromEvent(evr)
 }

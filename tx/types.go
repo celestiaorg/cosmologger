@@ -18,3 +18,10 @@ type TxRecord struct {
 	Json        string
 	LogTime     time.Time
 }
+
+type DataCollectionMode int
+
+const (
+	PullMode DataCollectionMode = iota + 1
+	EventMode
+)
