@@ -12,7 +12,7 @@ var Configs Configuration
 /*-------------------------*/
 
 // This function loads the configuration file into the Configs object
-func init() {
+func Init() {
 
 	filename := GetRootPath() + "/conf.json"
 	bytes, err := ioutil.ReadFile(filename)
