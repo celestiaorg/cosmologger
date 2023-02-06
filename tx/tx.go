@@ -110,6 +110,10 @@ func getTxRecordFromEvent(evr coretypes.ResultEvent) TxRecord {
 
 		txRecord.Sender = events["payfordata.signer"]
 	}
+	if events["payforblob.signer"] != "" {
+
+		txRecord.Sender = events["payforblob.signer"]
+	}
 
 	if events["transfer.recipient"] != "" {
 		txRecord.Receiver = events["transfer.recipient"]
