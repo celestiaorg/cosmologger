@@ -129,8 +129,8 @@ func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, 
 			height := int64(heightU) + 1
 
 			for {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(configs.Configs.GRPC.CallTimeout))
-				defer cancel()
+				// ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(configs.Configs.GRPC.CallTimeout))
+				ctx := context.Background()
 
 				res, err := cli.Block(ctx, &height)
 				if err != nil {
@@ -151,6 +151,7 @@ func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, 
 					log.Printf("processing block event: %v", err)
 				}
 
+				// cancel()
 				height++
 			}
 

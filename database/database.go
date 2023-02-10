@@ -1,6 +1,10 @@
 package database
 
-import "fmt"
+import (
+	"database/sql"
+	"fmt"
+	"strings"
+)
 
 /*-----------------------*/
 
@@ -142,4 +146,32 @@ func (db *Database) Exec(query string, params QueryParams) (ExecResult, error) {
 
 	return ExecResult{}, fmt.Errorf("no db.Type is set")
 
+}
+
+func (db *Database) IsErrNotFound(err error) bool {
+
+	if err == nil {
+		return false
+	}
+
+	switch db.Type {
+	case Postgres:
+		return sql.ErrNoRows == err
+	}
+
+	return false
+}
+
+func (db *Database) IsErrDuplicate(err error) bool {
+
+	if err == nil {
+		return false
+	}
+
+	switch db.Type {
+	case Postgres:
+		return strings.Contains(err.Error(), "duplicate key value")
+	}
+
+	return false
 }

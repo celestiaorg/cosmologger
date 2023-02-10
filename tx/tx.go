@@ -104,13 +104,12 @@ func getTxRecordFromEvent(evr coretypes.ResultEvent) TxRecord {
 	} else if events["transfer.sender"] != "" {
 
 		txRecord.Sender = events["transfer.sender"]
-	}
 
-	if events["payfordata.signer"] != "" {
+	} else if events["payfordata.signer"] != "" {
 
 		txRecord.Sender = events["payfordata.signer"]
-	}
-	if events["payforblob.signer"] != "" {
+
+	} else if events["payforblob.signer"] != "" {
 
 		txRecord.Sender = events["payforblob.signer"]
 	}
@@ -201,8 +200,8 @@ func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, 
 			height++
 
 			for {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(configs.Configs.GRPC.CallTimeout))
-				defer cancel()
+				// ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(configs.Configs.GRPC.CallTimeout))
+				ctx := context.Background()
 
 				txs, err := queryTxsByHeight(ctx, cli, height)
 				if err != nil {
@@ -217,6 +216,7 @@ func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, 
 					}
 				}
 
+				// cancel()
 				height++
 			}
 

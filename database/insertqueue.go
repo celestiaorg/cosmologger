@@ -52,7 +52,7 @@ func (i *InsertQueue) Start() error {
 			for _, row := range iq.Rows {
 				_, err := i.db.Insert(iq.Table, row)
 				if err != nil {
-					log.Printf("async insert: %v\nrow: %#v\n", err, row)
+					log.Printf("async insert: %v\ntable: `%v`\t row: %#v\n", err, iq.Table, row)
 				}
 			}
 		}
