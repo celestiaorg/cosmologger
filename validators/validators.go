@@ -2,7 +2,9 @@ package validators
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/celestiaorg/cosmologger/configs"
@@ -32,6 +34,11 @@ func queryValidatorInfoByValAddr(grpcCnn *grpc.ClientConn, valAddr string) (stak
 				ValidatorAddr: valAddr,
 			})
 		if err != nil {
+
+			if errors.Is(err, staking.ErrNoValidatorFound) {
+				return staking.Validator{}, nil
+			}
+
 			fmt.Printf("\r[%d", retry+1)
 			// fmt.Printf("\r\tRetrying [ %d ]...", retry+1)
 			// fmt.Printf("\tErr: %s", err)
@@ -111,6 +118,12 @@ func AddNewValidator(db *database.Database, grpcCnn *grpc.ClientConn, valAddr st
 	if err != nil {
 		return err
 	}
+
+	// If the validator data not found on chain
+	if vInfo.OperatorAddress == "" {
+		return nil
+	}
+
 	consAddr := GetConsAddressFromConsPubKey(vInfo.ConsensusPubkey.Value)
 	moniker := vInfo.Description.Moniker
 
@@ -120,15 +133,23 @@ func AddNewValidator(db *database.Database, grpcCnn *grpc.ClientConn, valAddr st
 	}
 	accountAddr := sdk.AccAddress(sdkValAddr.Bytes()).String()
 
+	cleanMoniker, err := RemoveNonLetterChars(moniker)
+	if err != nil {
+		return err
+	}
+
 	rec := ValidatorRecord{
 		ConsAddr:    consAddr,
 		OprAddr:     valAddr,
 		AccountAddr: accountAddr,
-		Moniker:     moniker,
+		Moniker:     cleanMoniker,
 	}
 
 	dbRow := rec.getDBRow()
 	_, err = db.Insert(database.TABLE_VALIDATORS, dbRow)
+	if db.IsErrDuplicate(err) {
+		return nil
+	}
 	return err
 }
 
@@ -197,14 +218,18 @@ func QueryValidatorsList(grpcCnn *grpc.ClientConn) ([]string, error) {
 
 		for i := range response.Validators {
 			validatorsList = append(validatorsList, response.Validators[i].OperatorAddress)
-			//TODO: Remove these prints
-			// fmt.Printf("Validator: %v \t %v\n", response.Validators[i].OperatorAddress, response.Validators[i].Description.Moniker)
 		}
 	}
 
-	// fmt.Printf("\n\n\tlen(validatorsList): %+v\n", len(validatorsList))
-
-	// panic(0)
-
 	return validatorsList, nil
+}
+
+// TODO: Potentially this function should go to the tools package
+func RemoveNonLetterChars(in string) (string, error) {
+
+	reg, err := regexp.Compile("[^a-zA-Z0-9 ]+")
+	if err != nil {
+		return "", err
+	}
+	return reg.ReplaceAllString(in, "*"), nil
 }
