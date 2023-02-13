@@ -136,7 +136,7 @@ func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, 
 				if err != nil {
 					if strings.Contains(err.Error(), "must be less than or equal to the current blockchain height") {
 						// We reached the current head, need to wait for a while
-						log.Printf("waiting for new blocks...")
+						log.Printf("waiting for new blocks... expected height: [%v]", height)
 						time.Sleep(time.Second * 5)
 						continue // Try again
 					}
