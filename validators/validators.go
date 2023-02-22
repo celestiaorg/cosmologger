@@ -186,7 +186,7 @@ func queryValidatorsSetByOffset(conn *grpc.ClientConn, offset int) (response *st
 			// fmt.Printf("\r[%d", retry+1)
 			fmt.Printf("\n[%d", retry+1)
 			// fmt.Printf("\r\tRetrying [ %d ]...", retry+1)
-			fmt.Printf("\tErr: %s", err)
+			fmt.Printf("\tqueryValidatorsSetByOffset: %s", err)
 
 			// Ideally we want to retry after getting 502 http error, because sometimes server returns it
 			// but we cannot have it as the protobuf Invoke does not return the status code

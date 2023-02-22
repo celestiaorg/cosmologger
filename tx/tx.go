@@ -197,7 +197,7 @@ func Start(cli *tmClient.HTTP, grpcCnn *grpc.ClientConn, db *database.Database, 
 			if err != nil {
 				log.Fatalf("getting the latest processed block height in tx_events: %v", err)
 			}
-			height++
+			// height++ // let's comment this out in case the program was aborted in the middle of the tx process
 
 			for {
 				// ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(configs.Configs.GRPC.CallTimeout))

@@ -1,7 +1,7 @@
 {
     "grpc":{
         "api_call_retry": 20,
-        "call_timeout": 30
+        "call_timeout": 300
     },
 
     "tendermint_client": {

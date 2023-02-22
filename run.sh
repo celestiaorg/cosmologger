@@ -6,8 +6,10 @@ set -o errexit -o nounset
 export $(cat ../.env | sed '/^#/d' | xargs)
 
 
-export RPC_ADDRESS=tcp://127.0.0.1:26657
-export GRPC_ADDRESS=127.0.0.1:9090
+export RPC_ADDRESS=tcp://rpc-mocha.pops.one:26657
+export GRPC_ADDRESS=grpc-mocha.pops.one:9090
+# export RPC_ADDRESS=tcp://127.0.0.1:26657
+# export GRPC_ADDRESS=127.0.0.1:9090
 export GRPC_TLS=false
 
 
