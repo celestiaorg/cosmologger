@@ -63,3 +63,7 @@ func (i *InsertQueue) Start() error {
 func (i *InsertQueue) Stop() {
 	i.closed = true
 }
+
+func (i *InsertQueue) GetQueueLen() int {
+	return i.insert.Len()
+}

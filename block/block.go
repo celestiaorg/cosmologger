@@ -21,7 +21,7 @@ import (
 
 func ProcessEvents(grpcCnn *grpc.ClientConn, rec *BlockRecord, db *database.Database, insertQueue *database.InsertQueue) error {
 
-	fmt.Printf("Block: %s\tH: %d\tTxs: %d\n", rec.BlockHash, rec.Height, rec.NumOfTxs)
+	fmt.Printf("Block: %s\tH: %d\tTxs: %d\tQueued: %d\n", rec.BlockHash, rec.Height, rec.NumOfTxs, insertQueue.GetQueueLen())
 
 	dbRow := rec.getBlockDBRow()
 	insertQueue.Add(database.TABLE_BLOCKS, dbRow)
